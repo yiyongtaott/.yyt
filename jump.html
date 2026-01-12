@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Loading...</title>
-    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
+<link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
     <style>
         body {
             background-color: #000;
@@ -31,14 +31,19 @@
 </head>
 <body>
 
-<div class="loader"></div>
-<div id="msg">正在初始化安全隧道...</div>
+    <div class="loader"></div>
+    <div id="msg">正在初始化安全隧道...</div>
 
 <script>
     (async () => {
-        window.location.href = 'http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa';
-
-        document.body.innerHTML = "失败了";
+        // 直接请求你的 Worker 并带上 get_source 参数
+        const target = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa";
+        try {
+            window.location.href = 'http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa';
+        } catch (e) { 
+            document.body.innerHTML = "网站挂了"; 
+            // 如果直连失败（比如还没部署成功），这里可以再放原来的代理逻辑作为备选
+        }
     })();
 </script>
 </body>
