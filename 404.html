@@ -5,118 +5,91 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
     <title>代理页面</title>
-    <style>
-        body { 
-            margin: 0; 
-            padding: 20px; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #f5f5f5;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        iframe {
-            width: 100%;
-            height: 500px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin-top: 20px;
-        }
-    </style>
 </head>
 <body>
-    <div class="container">
-        <h2>HTTP 代理页面</h2>
-        <p id="status">正在加载目标内容...</p>
-        <div id="content"></div>
-    </div>
+    <div id="content">代理页面加载中...</div>
 
     <script>
         // 获取 URL 参数
         const urlParams = new URLSearchParams(window.location.search);
         const targetUrl = urlParams.get('url');
+        const mode = urlParams.get('mode'); // raw 模式直接返回内容
         
         if (!targetUrl) {
-            document.getElementById('status').innerHTML = 
-                '<p style="color: red">错误：未指定目标URL</p>' +
-                '<p>使用格式：?url=http://example.com</p>';
+            document.getElementById('content').innerHTML = '<h2>错误：未指定URL</h2>';
             return;
         }
         
-        if (!targetUrl.startsWith('http://')) {
-            document.getElementById('status').innerHTML = 
-                '<p style="color: red">错误：仅支持 HTTP URL</p>';
-            return;
-        }
-        
-        console.log('目标URL:', targetUrl);
-        
-        // 方法1：使用 iframe 加载（简单直接）
-        function loadViaIframe() {
-            const iframe = document.createElement('iframe');
-            iframe.id = 'proxyFrame';
-            iframe.sandbox = 'allow-scripts allow-same-origin';
-            iframe.src = targetUrl;
-            
-            document.getElementById('content').appendChild(iframe);
-            document.getElementById('status').innerHTML = 
-                '正在通过 iframe 加载内容...';
-            
-            iframe.onload = function() {
-                document.getElementById('status').innerHTML = 
-                    '加载完成！内容显示在下方 iframe 中。';
-            };
-            
-            iframe.onerror = function() {
-                document.getElementById('status').innerHTML = 
-                    '<p style="color: red">iframe 加载失败</p>' +
-                    '<p>尝试使用 fetch 方法...</p>';
-                loadViaFetch();
-            };
-        }
-        
-        // 方法2：使用 fetch 获取内容（需要 CORS 支持）
-        async function loadViaFetch() {
-            try {
-                document.getElementById('status').innerHTML = '正在尝试 fetch...';
-                
-                // 使用 no-cors 模式
-                const response = await fetch(targetUrl, {
-                    mode: 'no-cors',
-                    referrerPolicy: 'no-referrer',
-                    headers: {
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        // 如果是 raw 模式，直接获取并返回内容
+        if (mode === 'raw') {
+            (async () => {
+                try {
+                    // 使用 CORS 代理绕过限制
+                    const proxyServices = [
+                        'https://api.allorigins.win/raw?url=',
+                        'https://corsproxy.io/?',
+                        'https://api.codetabs.com/v1/proxy?quest='
+                    ];
+                    
+                    let lastError = null;
+                    
+                    for (const proxy of proxyServices) {
+                        try {
+                            const proxyUrl = proxy + encodeURIComponent(targetUrl);
+                            const response = await fetch(proxyUrl, {
+                                headers: {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const content = await response.text();
+                                
+                                // 直接输出内容（作为纯文本）
+                                document.open();
+                                document.write(content);
+                                document.close();
+                                return;
+                            }
+                        } catch (error) {
+                            lastError = error;
+                            continue;
+                        }
                     }
-                });
-                
-                // no-cors 模式下无法读取响应内容，只能知道请求是否发送
-                if (response.type === 'opaque') {
-                    document.getElementById('status').innerHTML = 
-                        '请求已发送（no-cors模式）。<br>' +
-                        '由于浏览器安全限制，无法直接显示内容。<br>' +
-                        '请检查目标服务器是否支持 CORS。';
+                    
+                    // 所有代理都失败了，尝试直接 iframe
+                    document.open();
+                    document.write(`
+                        <iframe 
+                            src="${targetUrl}" 
+                            style="width:100%;height:100vh;border:none;"
+                            sandbox="allow-scripts allow-same-origin">
+                        </iframe>
+                    `);
+                    document.close();
+                    
+                } catch (error) {
+                    document.getElementById('content').innerHTML = `
+                        <h2>代理失败</h2>
+                        <p>${error.message}</p>
+                    `;
                 }
-            } catch (error) {
-                document.getElementById('status').innerHTML = 
-                    `<p style="color: red">fetch 失败: ${error.message}</p>` +
-                    '<p>所有方法都失败了，请检查：</p>' +
-                    '<ul>' +
-                    '<li>目标服务器是否在线</li>' +
-                    '<li>目标是否支持跨域访问</li>' +
-                    '<li>网络连接是否正常</li>' +
-                    '</ul>';
-            }
+            })();
+        } else {
+            // 正常模式显示界面
+            document.getElementById('content').innerHTML = `
+                <style>
+                    body { margin: 0; padding: 20px; font-family: sans-serif; }
+                    iframe { width: 100%; height: 90vh; border: 2px solid #ccc; }
+                </style>
+                <h2>HTTP 代理页面</h2>
+                <iframe 
+                    src="${targetUrl}" 
+                    sandbox="allow-scripts allow-same-origin">
+                </iframe>
+                <p><small>正在加载: ${targetUrl}</small></p>
+            `;
         }
-        
-        // 启动加载
-        window.onload = function() {
-            loadViaIframe();
-        };
     </script>
 </body>
 </html>
