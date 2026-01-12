@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>HTTP代理工具</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+        #proxyFrame {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 HTTP 资源代理工具</h1>
+        
+        <div class="input-group">
+            <label for="urlInput">输入 HTTP 地址：</label>
+            <input 
+                type="text" 
+                id="urlInput" 
+                placeholder="http://example.com"
+                value="http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa/?get_source=1">
+        </div>
+        
+        <div class="buttons">
+            <button class="btn-primary" onclick="loadViaIframe()">
+                通过 iframe 加载
+            </button>
+            <button class="btn-secondary" onclick="loadInNewWindow()">
+                在新窗口打开
+            </button>
+        </div>
+        
+        <div id="result" class="result">
+            <h3>加载结果</h3>
+            <div id="status">准备中...</div>
+        </div>
+        
+        <iframe id="proxyFrame" style="display:none;"></iframe>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const resultDiv = document.getElementById('result');
+        const statusDiv = document.getElementById('status');
+        const proxyFrame = document.getElementById('proxyFrame');
+        
+        function updateStatus(message, isError = false) {
+            statusDiv.innerHTML = message;
+            statusDiv.style.color = isError ? '#e74c3c' : '#27ae60';
+            resultDiv.style.display = 'block';
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function loadViaIframe() {
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                updateStatus('<span style="color: red">请输入 URL</span>', true);
+                return;
+            }
+            
+            if (!url.startsWith('http://')) {
+                updateStatus('<span style="color: red">只支持 HTTP 协议</span>', true);
+                return;
+            }
+            
+            updateStatus('正在通过 iframe 加载...');
+            
+            // 显示 iframe
+            proxyFrame.style.display = 'block';
+            proxyFrame.src = url;
+            
+            proxyFrame.onload = function() {
+                updateStatus('加载完成！内容显示在上方 iframe 中。');
+            };
+            
+            proxyFrame.onerror = function() {
+                updateStatus('iframe 加载失败，可能是：<br>' +
+                    '1. 目标服务器不支持 iframe 嵌入<br>' +
+                    '2. 网络连接问题<br>' +
+                    '3. 目标页面有 X-Frame-Options 限制', true);
+            };
+        }
+        
+        function loadInNewWindow() {
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                updateStatus('<span style="color: red">请输入 URL</span>', true);
+                return;
+            }
+            
+            if (!url.startsWith('http://')) {
+                updateStatus('<span style="color: red">只支持 HTTP 协议</span>', true);
+                return;
+            }
+            
+            const newWindow = window.open(url, '_blank');
+            if (newWindow) {
+                updateStatus('已在新窗口打开，请查看新标签页。');
+            } else {
+                updateStatus('新窗口被浏览器阻止，请允许弹窗或手动复制地址打开。<br>' +
+                    `地址：<code>${url}</code>`, true);
+            }
+        }
+        
+        // 自动填充当前页面的URL参数
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlFromParam = urlParams.get('url');
+            if (urlFromParam) {
+                urlInput.value = urlFromParam;
+            }
+        };
+    </script>
+</body>
+</html>
