@@ -2,46 +2,141 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>跳转中...</title>
-    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
+    <title>Connection Debugger</title>
     <style>
-        body {
-            background-color: #000;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            height: 100vh;
-        }
-        #proxyFrame {
-            width: 100%;
-            height: 100%;
-            border: none;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
+        body { background-color: #000; color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        .loader { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #msg { font-size: 14px; color: #888; white-space: pre-wrap; text-align: center; line-height: 1.6; }
+        .button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-<iframe
-        id="proxyFrame"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-        allow="autoplay; camera; microphone; geolocation; payment"
-        src="about:blank"
-></iframe>
+<div class="loader" id="loader"></div>
+<div id="msg">准备分析连接路径...</div>
+<div id="buttons" style="display:none; margin-top:20px;"></div>
+
+<!-- 隐藏的iframe用于加载HTTP页面 -->
+<iframe id="sourceFrame" class="hidden"></iframe>
 
 <script>
     (function() {
-        const iframe = document.getElementById('proxyFrame');
-        const targetUrl = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa/";
-
-        // 设置iframe的源为目标URL
-        iframe.src = targetUrl;
-
-        // 可选：监听iframe加载错误
-        iframe.onerror = function() {
-            iframe.contentDocument.body.innerHTML = "网站挂了";
+        const target = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa";
+        const log = (tag, msg, color = '#3498db') => {
+            const time = new Date().toLocaleTimeString();
+            console.log(`%c[${time}][${tag}] %c${msg}`, `color: ${color}; font-weight: bold`, "color: #fff");
+            document.getElementById('msg').innerHTML += `<br>[${tag}] ${msg}`;
         };
+
+        // 获取iframe内容并注入当前页面
+        function getIframeContentAndInject() {
+            return new Promise((resolve) => {
+                const iframe = document.getElementById('sourceFrame');
+
+                // 设置iframe加载完成后的处理函数
+                iframe.onload = function() {
+                    log('IFRAME', '页面加载完成，尝试获取源代码...', '#9b59b6');
+
+                    try {
+                        // 尝试访问iframe的内容
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        const sourceCode = iframeDoc.documentElement.outerHTML;
+
+                        if (sourceCode && sourceCode.length > 100) {
+                            log('IFRAME', '成功获取源代码，长度: ' + sourceCode.length + ' 字符', '#2ecc71');
+
+                            // 注入源代码到当前页面
+                            document.open();
+                            document.write(sourceCode);
+                            document.close();
+
+                            resolve({ ok: true, msg: '源代码已成功注入当前页面' });
+                        } else {
+                            log('IFRAME', '获取的源代码太短或为空', '#e74c3c');
+                            resolve({ ok: false, msg: '获取的源代码太短或为空' });
+                        }
+                    } catch (e) {
+                        log('IFRAME', '访问iframe内容失败: ' + e.message, '#e74c3c');
+                        log('IFRAME', '这可能是因为同源策略限制', '#e74c3c');
+                        resolve({ ok: false, msg: '同源策略阻止访问iframe内容: ' + e.message });
+                    }
+                };
+
+                // 设置iframe错误处理
+                iframe.onerror = function() {
+                    log('IFRAME', 'iframe加载出错', '#e74c3c');
+                    resolve({ ok: false, msg: 'iframe加载出错' });
+                };
+
+                // 开始加载目标页面到iframe
+                log('IFRAME', '正在通过iframe加载目标页面...', '#3498db');
+                iframe.src = target;
+
+                // 设置超时处理
+                setTimeout(() => {
+                    if (iframe.src === target) {
+                        log('IFRAME', 'iframe加载超时', '#e74c3c');
+                        resolve({ ok: false, msg: '加载超时' });
+                    }
+                }, 10000);
+            });
+        }
+
+        // --- 方案测试函数 ---
+        const methods = [
+            {
+                name: 'Form Submission',
+                desc: '【传统方法】通过Target=_blank或Iframe提交，浏览器限制最少',
+                execute: () => new Promise(res => {
+                    const iframeName = 'proxy_frame_' + Date.now();
+                    const iframe = document.createElement('iframe');
+                    iframe.name = iframeName;
+                    iframe.style.display = 'none';
+
+                    const form = document.createElement('form');
+                    form.method = 'GET';
+                    form.action = target;
+                    form.target = iframeName;
+
+                    document.body.appendChild(iframe);
+                    document.body.appendChild(form);
+
+                    try {
+                        form.submit();
+                        setTimeout(() => res({ ok: true, msg: 'Request Sent (Blind)' }), 2000);
+                    } catch (e) {
+                        res({ ok: false, msg: e.message });
+                    }
+                })
+            }
+        ];
+
+        async function runDebug() {
+            log('SYSTEM', '开始探测目标: ' + target, '#f1c40f');
+
+            for (const m of methods) {
+                log(m.name, `测试中... (${m.desc})`, '#9b59b6');
+                const result = await m.execute();
+
+                if (result.ok) {
+                    log(m.name, `✅ 成功! ${result.time ? result.time + 'ms' : result.msg}`, '#2ecc71');
+                    // 如果第一个方法成功，就停止测试
+                    break;
+                } else {
+                    log(m.name, `❌ 失败: ${result.msg}`, '#e74c3c');
+                }
+            }
+
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('buttons').style.display = 'block';
+            document.getElementById('buttons').innerHTML = `
+            <button class="button" onclick="window.open('${target}', '_blank')">强制手动打开 (100% 成功)</button>
+            <button class="button" onclick="location.reload()">重新测试</button>
+        `;
+        }
+
+        window.onload = runDebug;
     })();
 </script>
 </body>
