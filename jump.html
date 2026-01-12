@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Loading...</title>
-    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemonji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
+    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
     
     <!-- 添加 CSP meta 标签，允许内联脚本 -->
     <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval';">
@@ -51,132 +51,10 @@
     <div id="error" class="error" style="display:none;"></div>
     <div id="buttons" style="display:none; margin-top:20px;"></div>
 
-<!-- 将内联脚本改为外部引用或使用 nonce -->
 <script>
 // 主逻辑代码
 (function() {
     const target = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa/?get_source=1";
-    
-    // 尝试多种方法
-    async function tryMethod1() {
-        // 方法1：使用 image 标签（统计代码常用方法）
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.style.display = 'none';
-            img.onload = img.onerror = () => {
-                resolve(true);
-            };
-            img.src = target;
-            
-            // 设置超时
-            setTimeout(() => resolve(false), 3000);
-        });
-    }
-    
-    async function tryMethod2() {
-        // 方法2：使用 script 标签（JSONP 风格）
-        return new Promise((resolve) => {
-            const script = document.createElement('script');
-            script.src = target;
-            document.head.appendChild(script);
-            
-            script.onload = script.onerror = () => {
-                document.head.removeChild(script);
-                resolve(true);
-            };
-            
-            setTimeout(() => {
-                if (script.parentNode) {
-                    document.head.removeChild(script);
-                }
-                resolve(false);
-            }, 3000);
-        });
-    }
-    
-    async function tryMethod3() {
-        // 方法3：使用 form 提交（最兼容）
-        return new Promise((resolve) => {
-            const form = document.createElement('form');
-            form.method = 'GET';
-            form.action = target;
-            form.target = '_blank';
-            form.style.display = 'none';
-            
-            const iframe = document.createElement('iframe');
-            iframe.name = '_proxy_frame';
-            iframe.style.display = 'none';
-            iframe.onload = iframe.onerror = () => {
-                resolve(true);
-            };
-            
-            document.body.appendChild(iframe);
-            document.body.appendChild(form);
-            
-            form.submit();
-            
-            setTimeout(() => {
-                document.body.removeChild(form);
-                document.body.removeChild(iframe);
-                resolve(false);
-            }, 5000);
-        });
-    }
-    
-    async function tryMethod4() {
-        // 方法4：使用 iframe 直接加载
-        return new Promise((resolve) => {
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.sandbox = 'allow-scripts allow-same-origin';
-            iframe.src = target;
-            
-            iframe.onload = iframe.onerror = () => {
-                resolve(true);
-            };
-            
-            document.body.appendChild(iframe);
-            
-            setTimeout(() => {
-                if (iframe.parentNode) {
-                    document.body.removeChild(iframe);
-                }
-                resolve(false);
-            }, 5000);
-        });
-    }
-    
-    async function tryAllMethods() {
-        const methods = [
-            { name: '图片请求', func: tryMethod1 },
-            { name: '脚本请求', func: tryMethod2 },
-            { name: '表单提交', func: tryMethod3 },
-            { name: 'iframe加载', func: tryMethod4 }
-        ];
-        
-        document.getElementById('msg').textContent = '尝试连接...';
-        
-        for (let i = 0; i < methods.length; i++) {
-            const method = methods[i];
-            document.getElementById('msg').textContent = `尝试方法 ${i+1}/${methods.length}: ${method.name}...`;
-            
-            try {
-                const success = await method.func();
-                if (success) {
-                    console.log(`方法 ${method.name} 成功`);
-                    document.getElementById('msg').textContent = `${method.name} 请求已发送！`;
-                    return true;
-                }
-            } catch (err) {
-                console.log(`方法 ${method.name} 失败:`, err);
-            }
-            
-            // 等待一下再试下一个方法
-            await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
-        return false;
-    }
     
     // 显示错误并提供选项
     function showError(message) {
@@ -206,36 +84,215 @@
         buttonsDiv.style.display = 'block';
     }
     
+    // 直接使用 iframe 方法获取内容（最有可能成功）
+    async function tryIframeMethod() {
+        return new Promise((resolve) => {
+            // 创建一个隐藏的 iframe 来获取内容
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.sandbox = 'allow-scripts allow-same-origin';
+            
+            // 设置 iframe 的 src
+            iframe.src = target;
+            
+            // 监听 iframe 加载完成
+            iframe.onload = function() {
+                try {
+                    // 尝试从 iframe 中获取内容
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    const content = iframeDoc.documentElement.outerHTML;
+                    
+                    // 清理 iframe
+                    document.body.removeChild(iframe);
+                    
+                    resolve({
+                        success: true,
+                        content: content,
+                        method: 'iframe'
+                    });
+                } catch (e) {
+                    // 同源策略限制，无法读取内容
+                    document.body.removeChild(iframe);
+                    resolve({
+                        success: false,
+                        error: '无法读取内容（同源策略限制）'
+                    });
+                }
+            };
+            
+            iframe.onerror = function() {
+                document.body.removeChild(iframe);
+                resolve({
+                    success: false,
+                    error: 'iframe 加载失败'
+                });
+            };
+            
+            // 添加超时
+            setTimeout(() => {
+                if (iframe.parentNode) {
+                    document.body.removeChild(iframe);
+                }
+                resolve({
+                    success: false,
+                    error: '加载超时'
+                });
+            }, 10000);
+            
+            document.body.appendChild(iframe);
+        });
+    }
+    
+    // 使用 form 方法获取内容
+    async function tryFormMethod() {
+        return new Promise((resolve) => {
+            const form = document.createElement('form');
+            form.method = 'GET';
+            form.action = target;
+            form.style.display = 'none';
+            
+            const iframe = document.createElement('iframe');
+            iframe.name = '_proxy_form_result';
+            iframe.style.display = 'none';
+            
+            iframe.onload = function() {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    const content = iframeDoc.documentElement.outerHTML;
+                    
+                    resolve({
+                        success: true,
+                        content: content,
+                        method: 'form'
+                    });
+                } catch (e) {
+                    resolve({
+                        success: false,
+                        error: '无法读取表单结果'
+                    });
+                } finally {
+                    // 清理
+                    if (form.parentNode) document.body.removeChild(form);
+                    if (iframe.parentNode) document.body.removeChild(iframe);
+                }
+            };
+            
+            iframe.onerror = function() {
+                if (form.parentNode) document.body.removeChild(form);
+                if (iframe.parentNode) document.body.removeChild(iframe);
+                resolve({
+                    success: false,
+                    error: '表单提交失败'
+                });
+            };
+            
+            document.body.appendChild(iframe);
+            document.body.appendChild(form);
+            
+            // 设置超时
+            setTimeout(() => {
+                if (form.parentNode) document.body.removeChild(form);
+                if (iframe.parentNode) document.body.removeChild(iframe);
+                resolve({
+                    success: false,
+                    error: '表单提交超时'
+                });
+            }, 10000);
+            
+            form.submit();
+        });
+    }
+    
+    // 使用代理服务器获取内容（通过 404.html 页面）
+    async function tryProxyMethod() {
+        try {
+            // 通过 404.html 代理获取内容
+            const proxyUrl = `404.html?url=${encodeURIComponent(target)}&mode=raw`;
+            
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                const content = await response.text();
+                
+                // 检查内容是否有效
+                if (content && content.includes('<!DOCTYPE') || content.includes('<html')) {
+                    return {
+                        success: true,
+                        content: content,
+                        method: 'proxy'
+                    };
+                }
+            }
+            
+            return {
+                success: false,
+                error: '代理服务器返回无效内容'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: `代理请求失败: ${error.message}`
+            };
+        }
+    }
+    
+    // 显示获取到的内容
+    function displayContent(content) {
+        // 清空当前页面内容
+        document.open();
+        
+        // 写入获取到的内容
+        document.write(content);
+        
+        // 关闭文档流
+        document.close();
+        
+        // 确保页面正常显示
+        setTimeout(() => {
+            document.documentElement.style.visibility = 'visible';
+        }, 100);
+    }
+    
     // 主执行函数
     async function main() {
         try {
-            // 先尝试各种方法
-            const success = await tryAllMethods();
+            document.getElementById('msg').textContent = '正在尝试连接...';
             
-            if (!success) {
-                showError('所有方法都失败了。');
-            } else {
-                // 如果成功，显示成功消息
-                setTimeout(() => {
-                    document.getElementById('msg').textContent = '请求已成功发送！';
-                    document.querySelector('.loader').style.display = 'none';
+            // 方法顺序：iframe -> form -> proxy
+            const methods = [
+                { name: 'iframe加载', func: tryIframeMethod },
+                { name: '表单提交', func: tryFormMethod },
+                { name: '代理获取', func: tryProxyMethod }
+            ];
+            
+            for (let i = 0; i < methods.length; i++) {
+                const method = methods[i];
+                document.getElementById('msg').textContent = `尝试方法 ${i+1}/${methods.length}: ${method.name}...`;
+                
+                try {
+                    const result = await method.func();
                     
-                    // 3秒后显示选项
-                    setTimeout(() => {
-                        document.getElementById('buttons').innerHTML = `
-                            <button class="button" onclick="location.reload()">
-                                重新加载
-                            </button>
-                            <button class="button" onclick="window.open('${target}', '_blank')">
-                                查看目标页面
-                            </button>
-                        `;
-                        document.getElementById('buttons').style.display = 'block';
-                    }, 3000);
-                }, 1000);
+                    if (result.success && result.content) {
+                        console.log(`方法 ${method.name} 成功获取到内容`);
+                        
+                        // 直接显示内容，不显示任何中间界面
+                        displayContent(result.content);
+                        return; // 成功，退出函数
+                    } else {
+                        console.log(`方法 ${method.name} 失败:`, result.error);
+                    }
+                } catch (err) {
+                    console.log(`方法 ${method.name} 异常:`, err);
+                }
+                
+                // 等待一下再试下一个方法
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
+            
+            // 所有方法都失败了
+            showError('所有方法都失败了，无法获取内容。');
+            
         } catch (error) {
-            showError(`发生错误: ${error.message}`);
+            showError(`发生未知错误: ${error.message}`);
         }
     }
     
