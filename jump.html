@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Loading...</title>
-    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
+    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemonji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
+    
+    <!-- 添加 CSP meta 标签，允许内联脚本 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval';">
+    
     <style>
         body {
             background-color: #000;
@@ -27,101 +31,216 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #msg { font-size: 14px; color: #888; }
+        .error { color: #ff6b6b; margin-top: 20px; text-align: center; max-width: 600px; }
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 14px;
+        }
+        .button:hover { background: #2980b9; }
     </style>
 </head>
 <body>
     <div class="loader"></div>
     <div id="msg">正在初始化安全隧道...</div>
+    <div id="error" class="error" style="display:none;"></div>
+    <div id="buttons" style="display:none; margin-top:20px;"></div>
 
+<!-- 将内联脚本改为外部引用或使用 nonce -->
 <script>
-// === 修复后的代码 ===
+// 主逻辑代码
 (function() {
-    // 1. 重写网络请求方法
-    const originalFetch = window.fetch;
-    window.fetch = function(input, init = {}) {
-        let url = input;
-        if (typeof input !== 'string' && input.url) {
-            url = input.url;
-        }
-        
-        // 如果是 HTTP 请求，使用特殊配置
-        if (url && url.startsWith('http://')) {
-            const newInit = {
-                ...init,
-                mode: 'no-cors',
-                cache: 'no-cache',
-                referrerPolicy: 'no-referrer',
-                credentials: 'omit'
-            };
-            
-            console.log('Proxying HTTP request:', url);
-            return originalFetch.call(this, url, newInit);
-        }
-        
-        return originalFetch.call(this, input, init);
-    };
-    
-    // 2. 重写 XHR
-    const OriginalXHR = window.XMLHttpRequest;
-    window.XMLHttpRequest = class extends OriginalXHR {
-        open(method, url, async = true, user, password) {
-            this._isHttpRequest = url && url.startsWith('http://');
-            super.open(method, url, async, user, password);
-            
-            if (this._isHttpRequest) {
-                // 设置请求头
-                this.setRequestHeader('Accept', '*/*');
-            }
-        }
-        
-        send(body) {
-            this.timeout = 15000;
-            super.send(body);
-        }
-    };
-})();
-
-// 3. 执行 HTTP 请求
-(async () => {
     const target = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa/?get_source=1";
     
-    try {
-        // 使用修改后的 fetch
-        const response = await fetch(target);
-        
-        if (response.ok || response.type === 'opaque') {
-            const text = await response.text();
+    // 尝试多种方法
+    async function tryMethod1() {
+        // 方法1：使用 image 标签（统计代码常用方法）
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.style.display = 'none';
+            img.onload = img.onerror = () => {
+                resolve(true);
+            };
+            img.src = target;
             
-            if (text && text.trim()) {
-                // 创建 Blob URL（模拟本地文件）
-                const blob = new Blob([text], { type: 'text/html' });
-                const blobUrl = URL.createObjectURL(blob);
-                
-                // 方法1：直接在当前页面加载
-                document.open();
-                document.write(text);
-                document.close();
-                
-                // 方法2：在新窗口打开（备用）
-                // window.open(blobUrl, '_blank');
-            } else {
-                document.body.innerHTML = "获取到空内容";
-            }
-        } else {
-            document.body.innerHTML = `请求失败: ${response.status}`;
-        }
-    } catch (error) {
-        console.error('请求错误:', error);
-        
-        // 备用方案：使用 iframe 代理
-        document.body.innerHTML = `
-            <h3>正在使用备用方案加载...</h3>
-            <iframe 
-                src="https://yiyongtaott.github.io/.yyt/404.html?url=${encodeURIComponent(target)}"
-                style="width:100%;height:100%;border:none;">
-            </iframe>
-        `;
+            // 设置超时
+            setTimeout(() => resolve(false), 3000);
+        });
     }
+    
+    async function tryMethod2() {
+        // 方法2：使用 script 标签（JSONP 风格）
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = target;
+            document.head.appendChild(script);
+            
+            script.onload = script.onerror = () => {
+                document.head.removeChild(script);
+                resolve(true);
+            };
+            
+            setTimeout(() => {
+                if (script.parentNode) {
+                    document.head.removeChild(script);
+                }
+                resolve(false);
+            }, 3000);
+        });
+    }
+    
+    async function tryMethod3() {
+        // 方法3：使用 form 提交（最兼容）
+        return new Promise((resolve) => {
+            const form = document.createElement('form');
+            form.method = 'GET';
+            form.action = target;
+            form.target = '_blank';
+            form.style.display = 'none';
+            
+            const iframe = document.createElement('iframe');
+            iframe.name = '_proxy_frame';
+            iframe.style.display = 'none';
+            iframe.onload = iframe.onerror = () => {
+                resolve(true);
+            };
+            
+            document.body.appendChild(iframe);
+            document.body.appendChild(form);
+            
+            form.submit();
+            
+            setTimeout(() => {
+                document.body.removeChild(form);
+                document.body.removeChild(iframe);
+                resolve(false);
+            }, 5000);
+        });
+    }
+    
+    async function tryMethod4() {
+        // 方法4：使用 iframe 直接加载
+        return new Promise((resolve) => {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.sandbox = 'allow-scripts allow-same-origin';
+            iframe.src = target;
+            
+            iframe.onload = iframe.onerror = () => {
+                resolve(true);
+            };
+            
+            document.body.appendChild(iframe);
+            
+            setTimeout(() => {
+                if (iframe.parentNode) {
+                    document.body.removeChild(iframe);
+                }
+                resolve(false);
+            }, 5000);
+        });
+    }
+    
+    async function tryAllMethods() {
+        const methods = [
+            { name: '图片请求', func: tryMethod1 },
+            { name: '脚本请求', func: tryMethod2 },
+            { name: '表单提交', func: tryMethod3 },
+            { name: 'iframe加载', func: tryMethod4 }
+        ];
+        
+        document.getElementById('msg').textContent = '尝试连接...';
+        
+        for (let i = 0; i < methods.length; i++) {
+            const method = methods[i];
+            document.getElementById('msg').textContent = `尝试方法 ${i+1}/${methods.length}: ${method.name}...`;
+            
+            try {
+                const success = await method.func();
+                if (success) {
+                    console.log(`方法 ${method.name} 成功`);
+                    document.getElementById('msg').textContent = `${method.name} 请求已发送！`;
+                    return true;
+                }
+            } catch (err) {
+                console.log(`方法 ${method.name} 失败:`, err);
+            }
+            
+            // 等待一下再试下一个方法
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        return false;
+    }
+    
+    // 显示错误并提供选项
+    function showError(message) {
+        document.getElementById('msg').style.display = 'none';
+        document.querySelector('.loader').style.display = 'none';
+        
+        const errorDiv = document.getElementById('error');
+        errorDiv.innerHTML = `
+            <h3>连接失败</h3>
+            <p>${message}</p>
+            <p>由于浏览器安全策略，无法从 HTTPS 页面直接访问 HTTP 资源。</p>
+        `;
+        errorDiv.style.display = 'block';
+        
+        const buttonsDiv = document.getElementById('buttons');
+        buttonsDiv.innerHTML = `
+            <button class="button" onclick="window.location.href='404.html?url=${encodeURIComponent(target)}'">
+                通过代理页面访问
+            </button>
+            <button class="button" onclick="window.open('${target}', '_blank')">
+                在新窗口中直接打开
+            </button>
+            <button class="button" onclick="location.reload()">
+                重试
+            </button>
+        `;
+        buttonsDiv.style.display = 'block';
+    }
+    
+    // 主执行函数
+    async function main() {
+        try {
+            // 先尝试各种方法
+            const success = await tryAllMethods();
+            
+            if (!success) {
+                showError('所有方法都失败了。');
+            } else {
+                // 如果成功，显示成功消息
+                setTimeout(() => {
+                    document.getElementById('msg').textContent = '请求已成功发送！';
+                    document.querySelector('.loader').style.display = 'none';
+                    
+                    // 3秒后显示选项
+                    setTimeout(() => {
+                        document.getElementById('buttons').innerHTML = `
+                            <button class="button" onclick="location.reload()">
+                                重新加载
+                            </button>
+                            <button class="button" onclick="window.open('${target}', '_blank')">
+                                查看目标页面
+                            </button>
+                        `;
+                        document.getElementById('buttons').style.display = 'block';
+                    }, 3000);
+                }, 1000);
+            }
+        } catch (error) {
+            showError(`发生错误: ${error.message}`);
+        }
+    }
+    
+    // 启动
+    window.onload = main;
 })();
 </script>
 </body>
