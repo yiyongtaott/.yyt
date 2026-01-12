@@ -2,98 +2,47 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>正在连接...</title>
+    <title>跳转中...</title>
     <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
     <style>
         body {
             background-color: #000;
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
         }
-        .loader {
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
+        #proxyFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #msg { font-size: 14px; color: #888; }
     </style>
 </head>
 <body>
-
-    <div class="loader" id="loader"></div>
-    <div id="msg">正在建立隧道并解析源代码...</div>
+<iframe
+        id="proxyFrame"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+        allow="autoplay; camera; microphone; geolocation; payment"
+        src="about:blank"
+></iframe>
 
 <script>
-(function() {
-    const target = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa/?get_source=1";
-    const iframeName = "tunnel_frame_" + Math.random().toString(36).substring(7);
+    (function() {
+        const iframe = document.getElementById('proxyFrame');
+        const targetUrl = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa/";
 
-    // 1. 创建隐藏的 iframe 作为载体
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
+        // 设置iframe的源为目标URL
+        iframe.src = targetUrl;
 
-    // 2. 创建表单并自动提交
-    const form = document.createElement('form');
-    form.method = 'GET';
-    form.action = target;
-    form.target = iframeName;
-    document.body.appendChild(form);
-
-    // 监听加载完成事件
-    iframe.onload = function() {
-        try {
-            // 尝试获取 iframe 内部的 HTML 内容
-            const sourceCode = iframe.contentDocument ? iframe.contentDocument.documentElement.outerHTML : 
-                               (iframe.contentWindow ? iframe.contentWindow.document.documentElement.outerHTML : null);
-            
-            if (sourceCode && sourceCode !== "<html><head></head><body></body></html>") {
-                console.log("成功获取源代码，准备注入...");
-                // 3. 注入源代码覆盖当前页面
-                document.open();
-                document.write(sourceCode);
-                document.close();
-            } else {
-                throw new Error("Empty content");
-            }
-        } catch (e) {
-            // 如果因为跨域限制无法直接读取 iframe 内容（通常 HTTP 到 HTTPS 会触发）
-            // 则引导用户直接在当前窗口打开，这是最后的保底手段
-            console.error("无法提取内容:", e);
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('msg').innerHTML = `
-                <div style="text-align:center;">
-                    <p>由于安全策略，内容已在安全隧道中加载但无法自动解析。</p>
-                    <button onclick="window.location.href='${target}'" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">
-                        点此手动进入页面
-                    </button>
-                </div>`;
-        }
-    };
-
-    // 执行提交
-    form.submit();
-
-    // 设置超时检查
-    setTimeout(() => {
-        if (document.getElementById('msg').textContent.includes('正在建立隧道')) {
-            document.getElementById('msg').textContent = "连接超时，请检查网络或目标状态。";
-            document.getElementById('loader').style.display = 'none';
-        }
-    }, 8000);
-})();
+        // 可选：监听iframe加载错误
+        iframe.onerror = function() {
+            iframe.contentDocument.body.innerHTML = "网站挂了";
+        };
+    })();
 </script>
 </body>
 </html>
