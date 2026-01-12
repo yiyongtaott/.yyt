@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLandre.Sys</title>
+    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.4.27/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { 
+            --neon-blue: #0ea5e9; 
+            --neon-purple: #8b5cf6; 
+            --grid-color: rgba(139, 92, 246, 0.03); 
+        }
+        body { 
+            background: #0a0a0f; 
+            color: #e2e8f0; 
+            font-family: 'SF Mono', 'Courier New', monospace; 
+            overflow-x: hidden; 
+        }
+        .scan-line { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 4px; 
+            background: linear-gradient(90deg, transparent, var(--neon-blue), transparent); 
+            z-index: 9999; 
+            animation: scan 3s linear infinite; 
+            box-shadow: 0 0 15px var(--neon-blue); 
+        }
+        @keyframes scan { 
+            0% { transform: translateY(0); } 
+            100% { transform: translateY(100vh); } 
+        }
+        .circuit-bg { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: -1; 
+            opacity: 0.15; 
+            pointer-events: none; 
+        }
+        .circuit-path { 
+            fill: none; 
+            stroke: url(#neonGradient); 
+            stroke-width: 1; 
+            stroke-dasharray: 5, 5; 
+            stroke-opacity: 0.4; 
+        }
+        .terminal-card { 
+            background: rgba(15, 15, 25, 0.75); 
+            backdrop-filter: blur(15px); 
+            border: 1px solid rgba(139, 92, 246, 0.15); 
+            position: relative; 
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+            overflow: hidden; 
+        }
+        .terminal-card:hover { 
+            border-color: rgba(139, 92, 246, 0.6); 
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.25); 
+            transform: translateY(-3px); 
+        }
+        .status-dot { 
+            box-shadow: 0 0 15px currentColor; 
+            filter: brightness(1.3); 
+        }
+        .connection-line { 
+            content: ''; 
+            position: absolute; 
+            top: 50%; 
+            left: -10%; 
+            width: 120%; 
+            height: 1px; 
+            background: linear-gradient(90deg, transparent, var(--neon-purple), transparent); 
+            opacity: 0; 
+            transition: opacity 0.5s; 
+        }
+        .terminal-card:hover .connection-line { 
+            opacity: 0.3; 
+        }
+        .text-glow { 
+            text-shadow: 0 0 15px currentColor; 
+        }
+        @keyframes pulse-subtle { 
+            0%, 100% { opacity: 0.7; } 
+            50% { opacity: 1; } 
+        }
+        .pulse-subtle { 
+            animation: pulse-subtle 2s ease-in-out infinite; 
+        }
+        .fade-in { 
+            animation: fadeIn 0.8s ease-out; 
+        }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+        /* 控制台样式 */
+        .log-terminal-container { 
+            margin-top: 2rem; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+            padding-top: 1rem; 
+        }
+        .log-terminal { 
+            background: #050508; 
+            border: 1px solid #334155; 
+            border-radius: 6px; 
+            padding: 12px; 
+            height: 200px; 
+            overflow-y: auto; 
+            font-size: 12px; 
+            line-height: 1.6; 
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8); 
+        }
+        .log-line { 
+            display: flex; 
+            gap: 8px; 
+            margin-bottom: 4px; 
+            border-left: 2px solid transparent; 
+            padding-left: 6px; 
+        }
+        .log-line:hover { 
+            background: rgba(255,255,255,0.03); 
+        }
+        .log-time { 
+            color: #64748b; 
+            min-width: 80px; 
+        }
+        .log-tag { 
+            font-weight: bold; 
+            min-width: 60px; 
+        }
+        .log-sys { 
+            color: #94a3b8; 
+            border-left-color: #475569; 
+        }
+        .log-auth { 
+            color: #c084fc; 
+            border-left-color: #a855f7; 
+        }
+        .log-net { 
+            color: #38bdf8; 
+            border-left-color: #0ea5e9; 
+        }
+        .log-warn { 
+            color: #f43f5e; 
+            border-left-color: #e11d48; 
+        }
+        .log-chat { 
+            color: #10b981; 
+            border-left-color: #10b981; 
+        }
+        .log-chat-self { 
+            color: #38bdf8; 
+            border-left-color: #0ea5e9; 
+        }
+        ::-webkit-scrollbar { 
+            width: 6px; 
+            height: 6px; 
+        }
+        ::-webkit-scrollbar-track { 
+            background: #0f172a; 
+        }
+        ::-webkit-scrollbar-thumb { 
+            background: #334155; 
+            border-radius: 3px; 
+        }
+        ::-webkit-scrollbar-thumb:hover { 
+            background: #475569; 
+        }
+    </style>
+</head>
+<body>
+    <div class="scan-line"></div>
+
+    <svg class="circuit-bg" width="100%" height="100%">
+        <defs>
+            <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color: var(--neon-blue); stop-opacity:0.5" />
+                <stop offset="100%" style="stop-color: var(--neon-purple); stop-opacity:0.5" />
+            </linearGradient>
+            <pattern id="circuitGrid" width="80" height="80" patternUnits="userSpaceOnUse">
+                <path d="M 80 0 L 0 0 0 80" fill="none" stroke="var(--grid-color)" stroke-width="1.5"/>
+            </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#circuitGrid)" />
+        <path class="circuit-path" d="M -100 200 Q 300 100 500 400 T 900 100" />
+        <path class="circuit-path" d="M 1200 50 Q 800 300 400 100 T -100 500" />
+    </svg>
+
+    <div id="app" class="min-h-screen p-4 md:p-8 fade-in">
+        <div class="max-w-6xl mx-auto">
+            <!-- 头部状态栏 -->
+            <header class="mb-12 p-6 terminal-card rounded-2xl">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-3 h-3 bg-green-500 rounded-full status-dot pulse-subtle"></div>
+                            <span class="text-green-400 text-sm font-mono tracking-widest">系统运行中</span>
+                            <span class="text-slate-600 text-xs">|</span>
+                            <span class="text-slate-400 text-sm font-mono">控制台 φ</span>
+                        </div>
+                        <h1 class="glitch text-4xl md:text-6xl font-black tracking-tighter text-white" data-text="FLΛNDRE_TIAMAT">FLΛNDRE_TIAMAT</h1>
+                        <p class="text-slate-500 text-sm font-mono mt-3">三端视奸系统</p>
+                    </div>
+                    <div class="font-mono text-right">
+                        <div class="text-xs text-slate-500 uppercase tracking-widest mb-1">最后同步时间</div>
+                        <div class="text-2xl text-cyan-400 font-bold text-glow">{{ lastSyncTime || '同步中...' }}</div>
+                        <div class="text-[10px] text-slate-600 mt-2">Host: FLΛNDRE_TIAMAT</div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 设备面板 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+                <div v-for="(node, index) in displayNodes" :key="node.id" class="terminal-card rounded-2xl p-8 group">
+                    <div class="connection-line"></div>
+                    
+                    <!-- 设备头部 -->
+                    <div class="flex justify-between items-start mb-8">
+                        <div class="flex items-center gap-4">
+                            <div :class="['p-3 rounded-xl transition-all duration-500', 
+                                       node.type === 'desktop' ? 'bg-blue-500/10 border border-blue-500/20' :
+                                       node.type === 'notebook' ? 'bg-purple-500/10 border border-purple-500/20' :
+                                       'bg-cyan-500/10 border border-cyan-500/20']">
+                                <svg v-if="node.type === 'desktop'" class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                <svg v-else-if="node.type === 'notebook'" class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+                                </svg>
+                                <svg v-else class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-slate-500 uppercase tracking-[0.2em]">设备标识</div>
+                                <h3 class="text-xl font-bold text-white tracking-tight">{{ getDeviceName(node.id) }}</h3>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <div :class="['px-3 py-1 rounded-full text-xs font-bold font-mono border',
+                                        node.isOnline ? 'bg-green-900/30 text-green-400 border-green-500/30' : 
+                                        'bg-slate-900/50 text-slate-600 border-slate-700/50']">
+                                {{ node.isOnline ? '同步中' : '持久化记录' }}
+                            </div>
+                            <div :class="['w-2 h-2 rounded-full status-dot', 
+                                        node.isOnline ? 'bg-green-500 animate-pulse' : 'bg-slate-700']"></div>
+                        </div>
+                    </div>
+
+                    <!-- 设备状态 -->
+                    <div class="space-y-6">
+                        <div>
+                            <div class="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">当前活动前台</div>
+                            <div :class="['text-lg font-medium font-mono p-3 rounded-lg break-words whitespace-pre-wrap overflow-y-auto max-h-32', 
+            node.isOnline ? 'bg-white/5 text-slate-200' : 'bg-slate-900/30 text-slate-600']">
+    {{ node.status || '无数据流' }}
+</div>
+                        </div>
+                        
+                        <div class="pt-4 border-t border-white/5">
+                            <div class="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">最后响应时间</div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-slate-400 font-mono">{{ node.lastUpdate || '从未响应' }}</span>
+                                <span :class="['text-xs font-mono', node.isOnline ? 'text-cyan-400' : 'text-slate-700']">
+                                    {{ node.isOnline ? '加密连接' : '连接中断' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 集成群聊的控制台 -->
+            <div class="log-terminal-container">
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">[F&L. Sys] RESPONSE OUTPUT</span>
+                        <div class="flex items-center gap-2 ml-4">
+                            <div class="online-dot w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                            <span class="text-xs text-green-400 font-mono">在线: {{ onlineCount }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <!-- 新消息提示按钮 -->
+                        <button v-if="hasNewMessages" 
+                                @click="scrollToBottom"
+                                class="px-3 py-1 text-xs bg-purple-900/30 text-purple-300 border border-purple-700/30 rounded hover:bg-purple-800/40 transition flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                            </svg>
+                            新消息({{ newMessageCount }})
+                        </button>
+                        <input type="text" 
+                               class="px-2 py-1 text-xs bg-black/30 border border-slate-700 rounded font-mono w-24" 
+                               placeholder="昵称" 
+                               v-model="userName" 
+                               @change="saveUserName">
+                        <button @click="sendTestMessage" class="px-3 py-1 text-xs bg-cyan-900/30 text-cyan-400 border border-cyan-700/30 rounded hover:bg-cyan-800/40 transition">
+                            测试
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="log-terminal" ref="logContainer" @scroll="handleScroll" style="height: 220px;">
+                    <!-- 初始化系统日志（始终显示在最顶部） -->
+    <div v-for="(log, idx) in initLogs" :key="'init-log-' + idx" :class="['log-line', log.class]">
+        <span class="log-time font-mono text-[10px]">{{ log.time }}</span>
+        <span class="log-tag font-mono text-[10px]">[{{ log.tag }}]</span>
+        <span class="log-msg flex-grow truncate">{{ log.msg }}</span>
+    </div>
+    
+    <!-- 实时消息流分隔线 -->
+    <div v-if="combinedMessages.length > 0" class="log-line log-sys">
+        <span class="log-time font-mono text-[10px]">{{ getCurrentTime() }}</span>
+        <span class="log-tag font-mono text-[10px]">[SYS]</span>
+        <span class="log-msg flex-grow truncate">=== 实时消息流 ===</span>
+    </div>
+    
+    <!-- 实时消息流（设备消息 + 聊天消息混合显示，按时间排序） -->
+    <div v-for="item in combinedMessages" :key="item.id" :class="['log-line', getMessageClass(item)]">
+        <span class="log-time font-mono text-[10px]">{{ formatChatTime(item.timestamp || item.time) }}</span>
+        <span class="log-tag font-mono text-[10px]">
+            <span v-if="item.type === 'device'">[{{ item.tag }}]</span>
+            <span v-else>[{{ item.user.substring(0, 30) }}]</span>
+        </span>
+        <span class="log-msg flex-grow truncate">
+            <span v-if="item.type === 'device'">{{ item.msg }}</span>
+            <span v-else>{{ item.message }}</span>
+        </span>
+    </div>
+    
+    <!-- 输入提示 -->
+    <div class="animate-pulse text-purple-500 font-bold mt-1">_</div>
+                </div>
+                
+                <!-- 聊天输入框 -->
+                <div class="mt-3 flex gap-2">
+                    <input type="text" 
+                           class="flex-grow px-3 py-2 text-sm bg-black/40 border border-slate-700 rounded font-mono text-slate-300 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+                           v-model="chatInput" 
+                           placeholder="输入消息 (按Enter发送)" 
+                           @keyup="handleKeyUp"
+                           :disabled="!isOnline">
+                    <button class="px-4 py-2 text-sm bg-gradient-to-r from-cyan-900/40 to-purple-900/40 text-cyan-300 border border-cyan-700/30 rounded font-mono hover:from-cyan-800/50 hover:to-purple-800/50 transition"
+                            @click="sendChatMessage"
+                            :disabled="!isOnline || !chatInput.trim()">
+                        发送
+                    </button>
+                </div>
+            </div>
+
+            <!-- 底部信息 -->
+            <footer class="py-8 border-t border-white/5 text-center font-mono text-sm text-slate-600">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                    <p class="text-xs tracking-widest">神经连接协议 v4.9.5_7</p>
+                    <p class="text-xs text-cyan-500/60 pulse-subtle">数据流已加密</p>
+                    <p class="text-xs tracking-widest">建立于: 2026-01-10</p>
+                </div>
+                <p class="text-[10px] text-slate-700">本终端提供跨设备信息流的可视化呈现</p>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+    const API_BASE = (window.location.hostname.endsWith('cloudflare.dev') || 
+                 window.location.hostname.endsWith('workers.dev')) 
+    ? window.location.origin 
+    : 'http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa';
+        const app = Vue.createApp({
+            data() {
+                return {
+                    rawData: { devices: {}, times: {}, lastSeen: {} },
+                    lastSyncTime: '',
+                    logs: [],
+                    lastDeviceTimestamps: {},
+                    // 聊天相关数据
+                    chatMessages: [],
+                    chatInput: '',
+                    userName: localStorage.getItem('fl_chat_name') || 'Operator',
+                    sessionId: localStorage.getItem('fl_session_id') || this.generateSessionId(),
+                    onlineCount: 1,
+                    isOnline: false,
+                    logsShown: true, // 控制是否显示初始化日志
+        realtimeMessages: [], // 实时消息流（设备消息+群聊消息）
+        initLogs: [
+            { time: '22:29:52.023', tag: 'SYS', msg: 'Initializing F&L. Sys Response...', class: 'log-sys' },
+            { time: '22:29:52.324', tag: 'L-SYS', msg: 'Daemon thread started. ((守护线程已启动))', class: 'log-auth' },
+            { time: '22:29:52.425', tag: 'SYS', msg: 'Mounting user volume: /wonderland/FlandreTiamat', class: 'log-sys' },
+            { time: '22:29:52.824', tag: 'AUTH', msg: 'Identity Verified. Welcome, Operator.', class: 'log-auth' },
+            { time: '22:29:53.224', tag: 'L-PROTO', msg: 'Link established. The observer (L) is active.', class: 'log-auth' },
+            { time: '22:29:53.525', tag: 'CHAT', msg: '用户 Operator 加入群聊', class: 'log-net' },
+            { time: '22:29:54.026', tag: 'CHAT', msg: '群聊功能已激活，输入消息后按Enter发送', class: 'log-sys' }
+        ],
+                    // 新消息提示相关
+                    lastChatCount: 0,
+                    hasNewMessages: false,
+                    newMessageCount: 0,
+                    userScrolledUp: false, // 用户是否手动滚动过
+                    
+                    // 固定节点数据
+                    DEFAULT_NODES: [
+                        { id: 'desktop', type: 'desktop' },
+                        { id: 'notebook', type: 'notebook' },
+                        { id: 'phone', type: 'phone' }
+                    ]
+                };
+            },
+            
+            computed: {
+                displayNodes() {
+                    const now = Date.now();
+                    return this.DEFAULT_NODES.map(def => {
+                        const deviceId = def.id;
+                        const lastSeenTs = this.rawData.lastSeen[deviceId] || 0;
+                        let statusText = this.rawData.devices[deviceId] || '系统离线';
+                        
+                        if (statusText.includes('http')) {
+                            try { 
+                                const u = new URL(statusText); 
+                                statusText = 'Browsing: ' + u.hostname; 
+                            } catch(e) {}
+                        }
+                        
+                        return { 
+                            ...def, 
+                            status: statusText, 
+                            isOnline: (now - lastSeenTs) < 600000,
+                            lastUpdate: this.rawData.times[deviceId] || ''
+                        };
+                    });
+                },
+                // 合并实时消息和聊天消息，按时间排序
+    combinedMessages() {
+        // 转换设备消息格式
+        const deviceMsgs = this.realtimeMessages.map(msg => ({
+            ...msg,
+            id: 'dev_' + msg.timestamp + '_' + Math.random().toString(36).substr(2, 9),
+            type: 'device'
+        }));
+        
+        // 转换聊天消息格式
+        const chatMsgs = this.chatMessages.slice(-50).map(msg => ({
+            ...msg,
+            id: msg.id,
+            type: 'chat',
+            timestamp: msg.timestamp
+        }));
+        
+        // 合并并排序
+        return [...deviceMsgs, ...chatMsgs]
+            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+            .slice(-100); // 只显示最近100条
+    }
+            },
+            
+            methods: {
+                getDeviceName(id) {
+                    const deviceNameMap = { 
+                        'desktop': '台式电脑', 
+                        'notebook': '笔记本电脑', 
+                        'phone': '手机' 
+                    };
+                    return deviceNameMap[id] || id.toUpperCase();
+                },
+                
+                // 格式化聊天时间
+                formatChatTime(timestampOrTimeStr) {
+                    if (!timestampOrTimeStr) return '';
+                    
+                    if (typeof timestampOrTimeStr === 'number') {
+                        // 时间戳格式
+                        const date = new Date(timestampOrTimeStr);
+                        return date.toLocaleTimeString('zh-CN', { 
+                            hour12: false,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
+                    } else if (typeof timestampOrTimeStr === 'string') {
+                        // 字符串格式，检查是否已经有毫秒
+                        if (timestampOrTimeStr.includes('.') && timestampOrTimeStr.split('.')[1].length === 3) {
+                            return timestampOrTimeStr;
+                        } else {
+                            // 如果没有毫秒，添加.000
+                            return timestampOrTimeStr + '.000';
+                        }
+                    }
+                    return '';
+                },
+                
+                // 判断是否在底部
+                isAtBottom() {
+                    const container = this.$refs.logContainer;
+                    if (!container) return true;
+                    
+                    const threshold = 50; // 距离底部50px内都算底部
+                    const currentPosition = container.scrollTop + container.clientHeight;
+                    const totalHeight = container.scrollHeight;
+                    
+                    return totalHeight - currentPosition <= threshold;
+                },
+                
+                // 滚动到底部
+                scrollToBottom() {
+                    const container = this.$refs.logContainer;
+                    if (container) {
+                        container.scrollTop = container.scrollHeight;
+                        this.hasNewMessages = false;
+                        this.newMessageCount = 0;
+                        this.userScrolledUp = false;
+                    }
+                },
+                
+                // 处理滚动事件
+                handleScroll() {
+                    // 如果用户手动滚动并且不在底部，标记为用户滚动了
+                    if (!this.isAtBottom()) {
+                        this.userScrolledUp = true;
+                    } else {
+                        this.userScrolledUp = false;
+                        // 如果滚动到了底部，清除新消息提示
+                        this.hasNewMessages = false;
+                        this.newMessageCount = 0;
+                    }
+                },
+                
+                addLog(tag, msg, type = 'sys') {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + 
+                                    String(now.getMilliseconds()).padStart(3, '0');
+                    const classMap = { 
+                        'sys': 'log-sys', 
+                        'auth': 'log-auth', 
+                        'net': 'log-net', 
+                        'warn': 'log-warn',
+                        'chat': 'log-chat'
+                    };
+                    this.logs.push({ 
+                        time: timeStr, 
+                        tag: tag, 
+                        msg: msg, 
+                        class: classMap[type] || 'log-sys' 
+                    });
+                    if (this.logs.length > 50) this.logs.shift();
+                },
+                
+                async fetchData() {
+                    try {
+                        const res = await fetch(API_BASE + '/api/devices');
+                        if (res.ok) {
+                            const newData = await res.json();
+                            
+                            // 检查设备状态变化
+                            Object.keys(newData.times || {}).forEach(did => {
+                                if (newData.times[did] !== this.lastDeviceTimestamps[did]) {
+                                    const dName = this.getDeviceName(did);
+                                    const dStatus = newData.devices[did] || '';
+                                    const displayStatus = dStatus.length > 40 ? 
+                                        dStatus.substring(0, 40) + '...' : dStatus;
+
+                                    // 设备消息直接添加到实时显示区域（不存入logs）
+                    this.addRealtimeMessage({
+                        type: 'device',
+                        time: new Date().toLocaleTimeString('zh-CN', { hour12: false }) + '.' + 
+                              String(new Date().getMilliseconds()).padStart(3, '0'),
+                        tag: 'NET',
+                        msg: 'Data packet from ['+dName+']: '+displayStatus,
+                        deviceId: did,
+                        timestamp: Date.now()
+                    });
+                                }
+                            });
+                            
+                            this.rawData = newData;
+                            this.lastDeviceTimestamps = { ...(newData.times || {}) };
+                            this.lastSyncTime = new Date().toLocaleTimeString('zh-CN');
+                        }
+                    } catch (e) { 
+                        this.addLog('ERR', 'Connection lost to Cloudflare Edge.', 'warn'); 
+                    }
+                },
+                
+                // 添加新方法：添加实时消息（设备消息）
+                addRealtimeMessage(messageData) {
+                    // 直接插入到实时消息流中
+                    this.realtimeMessages.push(messageData);
+                    
+                    // 限制数量
+                    if (this.realtimeMessages.length > 100) {
+                        this.realtimeMessages.shift();
+                    }
+                    
+                    // 检查是否需要显示新消息提示
+                    if (!this.isAtBottom() || this.userScrolledUp) {
+                        this.hasNewMessages = true;
+                        this.newMessageCount += 1;
+                    } else {
+                        // 如果用户在底部，自动滚动
+                        this.$nextTick(() => {
+                            this.scrollToBottom();
+                        });
+                    }
+                },
+
+                // 聊天相关方法
+                generateSessionId() {
+                    const id = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('fl_session_id', id);
+                    return id;
+                },
+                
+                saveUserName() {
+                    localStorage.setItem('fl_chat_name', this.userName);
+                    this.sendHeartbeat();
+                    this.addLog('AUTH', `用户身份更新: ${this.userName}`, 'auth');
+                },
+                
+                async sendHeartbeat() {
+                    try {
+                        const res = await fetch(API_BASE + '/api/heartbeat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sessionId: this.sessionId,
+                                userName: this.userName
+                            })
+                        });
+                        
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.onlineCount = data.onlineCount;
+                            this.isOnline = true;
+                        }
+                    } catch (err) {
+                        console.error('Heartbeat failed:', err);
+                        this.isOnline = false;
+                    }
+                },
+                
+                async sendChatMessage() {
+                    if (!this.chatInput.trim() || !this.isOnline) return;
+                    
+                    const message = this.chatInput.trim();
+                    this.chatInput = '';
+                    
+                    try {
+                        const res = await fetch(API_BASE + '/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user: this.userName,
+                                message: message,
+                                sessionId: this.sessionId
+                            })
+                        });
+                        
+                        if (res.ok) {
+                            await this.fetchChatMessages();
+                        }
+                    } catch (err) {
+                        console.error('Send message failed:', err);
+                        this.addLog('ERR', '消息发送失败', 'warn');
+                    }
+                },
+                
+                handleKeyUp(event) {
+                    if (event.key === 'Enter') {
+                        this.sendChatMessage();
+                    }
+                },
+                
+                async fetchChatMessages() {
+                    try {
+                        const res = await fetch(API_BASE + '/api/chat');
+                        if (res.ok) {
+                            const messages = await res.json();
+                            const oldCount = this.chatMessages.length;
+                            this.chatMessages = messages;
+                            
+                            // 检查是否有新消息
+                            if (messages.length > oldCount) {
+                                const newMessagesCount = messages.length - oldCount;
+                                
+                                // 如果用户不在底部，显示新消息提示
+                                if (!this.isAtBottom() || this.userScrolledUp) {
+                                    this.hasNewMessages = true;
+                                    this.newMessageCount += newMessagesCount;
+                                } else {
+                                    // 如果用户在底部，自动滚动
+                                    this.$nextTick(() => {
+                                        this.scrollToBottom();
+                                    });
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Fetch chat failed:', err);
+                    }
+                },
+                
+                async fetchOnlineCount() {
+                    try {
+                        const res = await fetch(API_BASE + '/api/online');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.onlineCount = data.count;
+                        }
+                    } catch (err) {
+                        console.error('Fetch online count failed:', err);
+                    }
+                },
+                
+                sendTestMessage() {
+                    this.chatInput = '测试消息 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+                    this.sendChatMessage();
+                },
+                
+                getCurrentTime() {
+                    const now = new Date();
+                    return now.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + 
+                           String(now.getMilliseconds()).padStart(3, '0');
+                },
+                
+                getMessageClass(msg) {
+                    if (msg.sessionId === this.sessionId) return 'log-chat-self'; // 自己的消息用蓝色
+                    if (msg.user === '系统') return 'log-sys'; // 系统消息
+                    return 'log-chat'; // 其他人的消息用绿色
+                }
+            },
+            
+            mounted() {
+                this.addLog('SYS', 'Initializing F&L. Sys Response...', 'sys');
+                setTimeout(() => this.addLog('L-SYS', 'Daemon thread started. ((守护线程已启动))', 'auth'), 300);
+                setTimeout(() => this.addLog('SYS', 'Mounting user volume: /wonderland/FlandreTiamat', 'sys'), 400);
+                setTimeout(() => this.addLog('AUTH', 'Identity Verified. Welcome, Operator.', 'auth'), 800);
+                setTimeout(() => this.addLog('L-PROTO', 'Link established. The observer (L) is active.', 'auth'), 1200);
+                
+                this.fetchData();
+                this.deviceInterval = setInterval(() => this.fetchData(), 5000);
+                
+                if (!localStorage.getItem('fl_session_id')) {
+                    localStorage.setItem('fl_session_id', this.sessionId);
+                }
+                
+                setTimeout(() => {
+                    this.addLog('CHAT', `用户 ${this.userName} 加入群聊`, 'net');
+                }, 1500);
+                
+                this.sendHeartbeat();
+                this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 30000);
+                
+                this.fetchChatMessages();
+                this.chatPollInterval = setInterval(() => this.fetchChatMessages(), 3000);
+                
+                this.fetchOnlineCount();
+                
+                setTimeout(() => {
+                    this.addLog('CHAT', '群聊功能已激活，输入消息后按Enter发送', 'sys');
+                    // 初始化时滚动到底部
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
+                }, 2000);
+            },
+            
+            beforeUnmount() {
+                if (this.deviceInterval) clearInterval(this.deviceInterval);
+                if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                if (this.chatPollInterval) clearInterval(this.chatPollInterval);
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</body>
+</html>
