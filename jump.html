@@ -2,20 +2,48 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loading...</title>
-<link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
+    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f50d.svg" type="image/svg+xml">
     <style>
-        body {
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* 隐藏滚动条 */
             background-color: #000;
-            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* Iframe 样式：占满全屏 */
+        #app-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Loading 遮罩层样式：悬浮在 iframe 之上 */
+        #loading-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            z-index: 999; /* 确保在最上层 */
+            transition: opacity 0.5s ease; /* 消失时的渐变效果 */
         }
+
         .loader {
             border: 3px solid rgba(255, 255, 255, 0.1);
             border-top: 3px solid #3498db;
@@ -25,25 +53,51 @@
             animation: spin 1s linear infinite;
             margin-bottom: 15px;
         }
+
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #msg { font-size: 14px; color: #888; }
+        
+        /* 隐藏类 */
+        .hidden {
+            opacity: 0;
+            pointer-events: none; /* 隐藏后不阻挡点击 iframe */
+        }
     </style>
 </head>
 <body>
 
-    <div class="loader"></div>
-    <div id="msg">正在初始化安全隧道...</div>
+    <div id="loading-mask">
+        <div class="loader"></div>
+        <div id="msg">正在建立安全连接....</div>
+    </div>
+
+    <iframe id="app-frame" sandbox="allow-forms allow-scripts allow-same-origin allow-popups"></iframe>
 
 <script>
-    (async () => {
-        // 直接请求你的 Worker 并带上 get_source 参数
+    (() => {
         const target = "http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa";
-        try {
-            window.location.href = 'http://9.3.0.1.9.1.0.0.0.7.4.0.1.0.0.2.ip6.arpa';
-        } catch (e) { 
-            document.body.innerHTML = "网站挂了"; 
-            // 如果直连失败（比如还没部署成功），这里可以再放原来的代理逻辑作为备选
-        }
+        const iframe = document.getElementById('app-frame');
+        const loadingMask = document.getElementById('loading-mask');
+
+        // 设置 iframe 地址
+        iframe.src = target;
+
+        // 辅助函数：隐藏 loading
+        const hideLoading = () => {
+            loadingMask.classList.add('hidden');
+        };
+
+        // 监听 iframe 加载完成事件
+        // 注意：如果是跨域 iframe，onload 可能不会准确触发，或者无法判断内部内容是否渲染完毕
+        iframe.onload = () => {
+            console.log("Frame loaded");
+            // 延迟一点点消失，让用户感觉更平滑
+            setTimeout(hideLoading, 500); 
+        };
+
+        // 保底策略：如果 3 秒后 onload 还没触发（比如网络卡顿或跨域限制），强制移除遮罩
+        // 这样用户至少能看到里面加载出来的部分内容（或者浏览器的报错页）
+        setTimeout(hideLoading, 3000);
     })();
 </script>
 </body>
